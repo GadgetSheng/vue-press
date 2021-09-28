@@ -1,0 +1,24 @@
+{
+  "name": "bfe.lessons",
+  "version": "1.0.0",
+  "description": "bfe的补课站点",
+  "main": "index.js",
+  "repository": "git@github.com:steven7sheng/vue-press.git",
+  "author": "steven7sheng",
+  "license": "MIT",
+  "scripts": {
+    "docs:dev": "vuepress dev docs",
+    "docs:build": "vuepress build docs"
+  },
+  "dependencies": {
+    "core-js": "^2.6.11"
+  },
+  "devDependencies": {
+    "@vuepress/plugin-docsearch": "^2.0.0-beta.26",
+    "@vuepress/plugin-palette": "^2.0.0-beta.26",
+    "@vuepress/plugin-register-components": "^2.0.0-beta.26",
+    "@vuepress/plugin-search": "^2.0.0-beta.26",
+    "vuepress": "^2.0.0-beta.26"
+  },
+  "creator": ">=2.0.0"
+}
