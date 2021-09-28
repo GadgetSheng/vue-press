@@ -4,7 +4,7 @@ import sidebar from './config/sidebar';
 import navbar from './config/nav';
 
 export default defineUserConfig<DefaultThemeOptions>({
-  base: '/vue-press/',
+  base: process.env.PROJECT_PATH || '',
   title: 'BFE.LESSONS',
   description: 'Just play around',
   themeConfig: {
