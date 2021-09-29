@@ -1,6 +1,5 @@
 import { defineUserConfig } from 'vuepress';
 import type { DefaultThemeOptions } from 'vuepress';
-import path from '@vuepress/utils';
 import sidebar from './config/sidebar';
 import navbar from './config/nav';
 
@@ -11,7 +10,7 @@ export default defineUserConfig<DefaultThemeOptions>({
   title: 'BFE.LEARNING',
   description: 'Just learning <BIG.FRONT.END>',
   themeConfig: {
-    logo: './images/logo.png',
+    logo: '/images/logo.png',
     smoothScroll: true,
     navbar,
     sidebar,
@@ -19,7 +18,6 @@ export default defineUserConfig<DefaultThemeOptions>({
     // repo: "https://github.com/zpfz/vuepress-creator",
   },
   plugins: [
-    ['@vuepress/search', { searchMaxSuggestions: 10 }],
-    // ['@vuepress/docsearch', { apiKey: '<API_KEY>', indexName: '<INDEX_NAME>' }]
+    ['@vuepress/search', { searchMaxSuggestions: 10 }]
   ]
 });
