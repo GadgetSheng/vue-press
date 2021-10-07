@@ -20,7 +20,7 @@ jobs:
     - name: Install and Build
       run: |
         npm install
-        npm run-script docs:build
+        npm run-script build
     - name: Deploy
       uses: JamesIves/github-pages-deploy-action@releases/v4
       with:

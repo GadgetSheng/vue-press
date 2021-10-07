@@ -67,6 +67,7 @@ _site
 yarn.lock
 package-lock.json
 /coverage
+pnpm-lock.yaml
 
 # useless files
 templete

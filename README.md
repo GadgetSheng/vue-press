@@ -1,3 +1,3 @@
 # Learning
 
-see: [https://steven7sheng.github.com/vue-press]
+see: [https://steven7sheng.github.io/vue-press]
