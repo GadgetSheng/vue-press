@@ -7,8 +7,8 @@
   "author": "steven7sheng",
   "license": "MIT",
   "scripts": {
-    "dev": "vuepress dev docs",
-    "build": "vuepress build -d public/ docs",
+    "dev": "VP_BASE='/vue-press/' vuepress dev docs",
+    "build": "VP_BASE='/vue-press/' vuepress build -d public/ docs",
     "deploy": "GH=1 yarn build && bash scripts/manually-deploy-.sh"
   },
   "dependencies": {

@@ -1,8 +1,7 @@
-module.exports = [
+const sidebar = [
   {
     text: 'Guide',
-    link: '/guide/',
-    children: ['/guide/starter']
+    link: '/guide/'
   },
   {
     text: 'Category',
@@ -15,3 +14,4 @@ module.exports = [
     children: ['/packager/webpack.md']
   }
 ];
+export default sidebar;

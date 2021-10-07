@@ -1,4 +1,4 @@
-module.exports = [
+const nav = [
   // Nav 1
   {
     text: "Home",
@@ -10,3 +10,4 @@ module.exports = [
     link: "/category/"
   }
 ];
+export default nav;
