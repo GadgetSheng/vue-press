@@ -5,9 +5,13 @@
 
 ************************************************ */
 
-// You can override default preset from the following (using stylus or css)
+/* // You can override default preset from the following (using stylus or css)
 // 颜色
 $accentColor = #00bcd4
 $textColor = #2c3e50
 $borderColor = #eaecef
-$codeBgColor = #282c34
+$codeBgColor = #282c34 */
+
+:root {
+  --c-text-lighter : #EB5757
+}

@@ -3,8 +3,6 @@ import type { DefaultThemeOptions } from 'vuepress';
 import sidebar from './sidebar';
 import navbar from './nav';
 
-console.log(`%c> PROJECT_PATH = ${process.env.PROJECT_PATH}`, 'color:yellow;background:#333;');
-
 export default defineUserConfig<DefaultThemeOptions>({
   base: process.env.VP_BASE || '/vue-press/',
   title: 'BFE.LEARNING',
@@ -19,6 +17,14 @@ export default defineUserConfig<DefaultThemeOptions>({
     repo: "https://github.com/steven7sheng/vue-press",
   },
   plugins: [
-    ['@vuepress/search', { searchMaxSuggestions: 10 }]
+    ['@vuepress/search', { searchMaxSuggestions: 10 }],
+    ['@vuepress/plugin-palette', {
+      preset: 'scss',
+      userPaletteFile: '.vuepress/styles/palette.scss',
+      tempPaletteFile: 'styles/palette.scss',
+      userStyleFile: '.vuepress/styles/index.styl',
+      tempStyleFile: 'styles/index.styl',
+      importCode: (filePath) => `@forward '${filePath}';\n`
+    }]
   ]
 });
