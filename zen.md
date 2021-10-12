@@ -7,4 +7,5 @@ steven7sheng补课的文档站点
 2. 升级模板命令 `vuepress-creator upgrade -t`
 3. 建立项目 `vuepress-creator init dir`
 4. 升级vuepress@next
-5. 调色板不再默认支持需要`npm i -D @vuepress/plugin-palette@next`
+5. 关于调色版参考 [2.x版本参考](https://v2.vuepress.vuejs.org/reference/default-theme/styles.html#palette-file)
+

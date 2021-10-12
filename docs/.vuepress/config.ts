@@ -17,14 +17,6 @@ export default defineUserConfig<DefaultThemeOptions>({
     repo: "https://github.com/steven7sheng/vue-press",
   },
   plugins: [
-    ['@vuepress/search', { searchMaxSuggestions: 10 }],
-    ['@vuepress/plugin-palette', {
-      preset: 'scss',
-      userPaletteFile: '.vuepress/styles/palette.scss',
-      tempPaletteFile: 'styles/palette.scss',
-      userStyleFile: '.vuepress/styles/index.styl',
-      tempStyleFile: 'styles/index.styl',
-      importCode: (filePath) => `@forward '${filePath}';\n`
-    }]
+    ['@vuepress/search', { searchMaxSuggestions: 10 }]
   ]
 });
