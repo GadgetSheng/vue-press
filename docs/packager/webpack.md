@@ -458,9 +458,270 @@ new HtmlWebpackPlugin({
         preserveLineBreaks: false,
         minifyCSS: true,
         minifyJS: true,
-        removeComments: false
+        removeComments: false 的定义: font-size of the root elementrem 和 px 对比
+移动端CSS px自动转换成rem
+使用px2rem-loader
     }
 })
 ```
+
+
+
+### 03 webpack进阶用法
+
+1. 当前构建的问题
+每次构建的时候不会清理目录，造成构建的输出目录output文件越来越多
+
+通过 npm scripts 清理构建目录
+`rm -rf ./dist && webpack`
+`rimraf ./dist && webpack`
+
+自动清理构建目录
+避免构建前每次都需要手动删除dist
+使用clean-webpack-plugin ,默认会删除output指定的输出目录
+
+```js
+const plugins=[ new CleanWebpackPlugin() ] 
+```
+
+2. CSS3属性为什么需要前缀?
+* Trident(-ms)
+* Geko(-moz)
+* Webkit(-webkit)
+* Presto(-o)
+
+举个例子
+```css
+.box{
+    -moz-border-radius: 10px;
+    -webkit-border-radius: 10px;
+    -o-border-radius: 10px;
+    border-radius: 10px;
+}
+```
+PostCSS插件 autoprefixer 自动补齐CSS3前缀
+使用 autoprefixer 插件
+根据 CanIUse规则
+```js
+const module.rules=
+{
+    test: /\.less$/,
+    use:[
+        'style-loader', 'css-loader', 'less-loader',
+        {
+            loader: 'postcss-loader',
+            options:{ plugins:()=>[
+                    require('autoprefixer')({
+                        browsers:[ "last 2 version",">1%","iOS 7" ]
+                    })
+                ]
+            }
+        }
+    ]
+}
+```
+
+3. 浏览器的分辨率
+CSS 媒体查询实现响应式布局
+```css
+@media screen and (max-width: 980px){
+    .header { width: 900px; }
+}
+@media screen and (max-width: 480px){
+    .header { width: 400px; }
+}
+@media screen and (max-width: 350px){
+    .header { width: 300px; }
+}
+```
+
+4. rem 是什么
+> W3C 对 `rem` 的定义: font-size of the root element
+
+rem 和 px 对比
+* rem 是相对单位
+* px 是绝对单位
+
+移动端CSS px自动转换成rem
+
+使用`px2rem-loader`
+页面渲染时计算根元素的font-size值
+* 可以使用手淘的lib-flexible库
+* https://github.com/amfe/lib-flexible
+
+```js
+const rules1.use=[{
+    'style-loader','css-loader','less-loader',
+    {
+        loader: 'px2rem-loader',
+        options:{
+            remUnit: 75,
+            remPecision: 8
+        }
+    }
+}]
+```
+
+资源内联的意义
+代码层面：
+* 页面框架的初始化脚本
+* 上报相关打点
+* css内联避免页面闪动
+请求层面: 减少HTTP网络请求数
+* 小图片或者字体内联 url-loader
+
+HTML 和 JS 内联
+
+raw-loader 内联 html
+```html
+<script>${require('raw-loader!babel-loader!./meta.html')}</script>
+```
+raw-loader 内联 js
+```html
+<script>${require('raw-loader!babel-loader!../node_modules/lib-flexible')}</script>
+```
+css 内联
+方案一 借助 style-loader
+方案二 html-inline-css-webpack-plugin
+```js
+const rules1.use=[
+    { 
+        loader: 'style-loader',
+        options:{
+            insertAt: 'top',// 样式插入到<head>
+            singleton: true,// 将所有的style标签合并成一个
+        },
+        'css-loader',
+        'sass-loader'
+    }
+}]
+```
+
+多页面应用(PWA)概念
+> 每一次页面跳转的时候，后台服务器都会给返回一个新的html文档，
+> 
+> 这种类型的网站也就是多页面网站，也叫做多页面应用
+
+多页面打包基本思路
+
+每个页面对应一个entry，一个html-webpack-plugin
+缺点：每次新增或删除页面需要改webpack配置
+
+多页面打包 通用方案
+
+动态获取entry 和设置 html-webpack-plugin
+利用 glob.sync
+* entry: glob.sync(path.join(__dirname,'./src/*/index.js')),
+
+使用 source map
+
+作用：通过source map定位到源码
+* source map 科普 阮一峰javascript_source_map
+
+开发环境开启，线上环境关闭
+* 线上排查问题的时候可以将sourcemap上传到错误监控系统
+
+source map 关键字
+
+eval: 使用eval包裹模块代码
+
+source map： 产生.map文件
+
+cheap： 不包含列信息
+
+inline： 将.map作为DataURI嵌入，不单独产生.map文件
+
+module：包含loader的sourcemap
+
+source map 类型
+* none =prod yes
+* eval
+* cheap-eval-source-map
+* cheap-module-source-map
+* eval-source-map
+* cheap-source-map =prod yes
+* cheap-module-source-map =prod yes
+* inline-cheap-source-map
+* inline-cheap-module-source-map
+* source-map =prod yes
+* inline-source-map
+* hidden-source-map =prod yes
+
+基础库分离
+思路：将react、react-dom 基础包通过cdn引入，不打入bundle中
+方法：使用html-webpack-externals-plugin
+```js
+cosnt plugins=[
+    new HtmlWebpackExternalsPlugin({
+        externals:[
+            {module: 'react',entry:'//cdn/react.min.js?v=123'},
+            {module: 'react-dom',entry:'//cdn/react-dom.min.js?v=123'}
+        ]
+    })
+]
+```
+使用SplitChunksPlugin 进行公共脚本分离
+webpack4 内置的，替代CommonsChunkPlugin 插件
+
+chunks 参数说明：
+* async 异步引入的库进行分离(默认)
+* initial 同步引入的库进行分离
+* all 所有引入的库进行分离(推荐)
+```js
+module.exports={
+optimization: {
+    splitChunks: {
+        chunks: 'async',
+        minSize: 30000,
+        maxSize: 0,
+        minChunks: 1,
+        maxAsyncRequests: 5,
+        maxInitialRequests: 3,
+        automaticNameDelimiter: '~',
+        name: true,
+        cacheGroups: {
+            vendors: {
+            test: /[\\/]node_modules[\\/]/,
+            priority: -10
+        }
+    }
+}
+```
+利用SplitChunksPlugin 分离基础包
+
+test: 匹配出需要分离的包
+```js
+optimization.splitChunks.cacheGroups={
+    commons: {
+        test:/(react|react-dom)/,
+        name: 'vendors',
+        chunks: 'all'
+    }
+}
+```
+
+利用SplitChunksPlugin 分离公共文件
+
+minChunks: 设置最小引用次数为2次
+minSize：分离的包体积的大小
+```js
+optimiaztion.splitChunks={
+    minSize: 0,
+    cacheGroups:{
+        commons: {
+            name: 'commons',
+            chunks: 'all',
+            minChunks: 2
+        }
+    }
+}
+```
+
+Tree Shaking(摇树优化)
+
+
+
+
+
 
 
