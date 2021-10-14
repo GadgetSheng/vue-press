@@ -718,10 +718,212 @@ optimiaztion.splitChunks={
 ```
 
 Tree Shaking(摇树优化)
+概念： 1个模块可能有多个方法，只要其中的某个方法使用到了，则整个文件都会被打到bundle里面去，tree-shaking就是只把用到的方法打入bundle，没用到的方法会在uglify阶段被擦除掉。
+
+使用：webpack默认支持，在.babelrc中里设置modules:false即可
+* production mode的情况下默认开启
+  
+要求: 必须是ES6的语法,CJS的方式不支持
+
+DCE(Dead code elimination)
+代码不会被执行,不可到达
+代码执行的结果不会被用到
+代码只会影响死变量(只写不读)
+
+Tree-Shanking原理
+利用ES6 模块的特点:
+* 只能作为模块顶层的语句出现(静态编译)
+* import的模块名只能是字符串常量
+* import binding 是 immutable的
+代码擦除:uglify阶段删除无用代码
+
+现象:构建后的代码存在大量闭包代码
+```js
+    //a.js
+    export default 'xxxx';
+    //b.js
+    import index from './a';
+    console.log(index);
+```
+--->
+```js
+function(module,__webpack_exports__,webpack_require__){
+    "use strict";
+    __webpack_require__.r(__webpack_exports__);
+    var _js_index_WEBPACK_IMPORTED_MODULE_0__=__webpack_require__(
+        console.log(__js_index_WEBPACK_IMPORTED_MODULE_0__["default"]);
+    );
+}
+```
+
+会导致什么问题?
+大量作用域包裹代码,导致体积增大(模块越多越明显)
+运行代码时创建的函数作用域变多,内存开销变大
+
+模块转换分析
+```js
+import { helloworld } from './helloworld';
+import '../../common';
+
+document.write(helloworld());
+```
+--->
+```js
+/* harmony import */ var _common__WEBPACK_IMPORTED_MODULE_0__= __webpack_requrie__(1);
+/* harmony import */ var _common__WEBPACK_IMPORTED_MODULE_1__= __webpack_requrie__(2);
+```
+结论:
+* 被webpack转换后的模块会带上一层包裹
+* import 会被转换成 __webpack_require
+
+进一步分析webpack的模块机制
+分析:
+* 打包出来的是一个IIFE(匿名闭包)
+* modules是一个数组,每一项是一个模块初始化函数
+* __webpack_require 用来加载模块,返回 modules.exports
+* 通过`WEBPACK_REQUIRE_METHOD(0)` 启动程序
+  
+scope hoisting原理
+原理: 将所有模块的代码按照引用顺序放在一个函数作用域里,然后适当的重命名一些变量以防止变量名冲突
+对比: 通过scope hoisting可以减少函数声明代码和内存开销
+scope hoisting使用
+webpack mode为production 默认开启
+必须是ES6语法 CJS不支持
+
+```js
+    const plugins=[
+        new webpack.optimize.ModuleConcatenationPlugin();
+    ];
+```
+代码分割的意义
+
+对于大的web应用来讲,将所有的代码都放在一个文件中显然是不够有效的,
+特别是当你的某些代码是在某些特殊的时候才会被使用到.webapck有一个功能就是将你的
+代码库分割成chunks(语块),当代码运行到需要它们的时候在进行加载.
+
+适用的场景:
+抽离相同代码到一个共享块
+脚本懒加载,使得初始下载的代码更小
+
+懒加载JS脚本的方式
+CommonjS: require.ensure
+ES6: 动态import(目前还没原生支持,需要babel转换)
+
+如果使用动态 import?
+安装babel插件 @babel/plugin-syntax-dynamic-import
+```js
+const plugins=['@babel/plugin-syntax-dynamic-import'];
+```
+代码分割效果
+Assert Size Chunks
+xxxx.js 176 bytes 2 [emmitted]
 
 
+ESLint的必要性
+案例: 某手机系统的webview而没有使用X5内核,解析JSON时遇到重复key报错,导致白屏
+> 如何避免类似代码问题?
 
+行业里优秀的 ESLint 规范实践
+腾讯: 
+* alloyteam 团队-> eslint-config-alloy
+* ivweb 团队-> eslint-config-ivweb
 
+制定团队的ESLint 规范
+不重复早轮子,基于 eslint:recommend 配置并改进
+能够帮助发现代码错误的规则,全部开启
+帮助保持团队的代码风格统一,而不是限制开发体验
 
+ESLint如何落地
+和CI/CD系统集成,和webpack集成
+方案一: webpack与CI/CD集成
+**CI PIPELINE** 增加 lint pipeline
+本地开发阶段增加pre commit钩子
+1. 安装husky
+2. 增加npm script -> precommit lint-staged
+```json
+{
+    "lint-staged":{ linters:{"*.{js,scss}":["eslint --fix","git add"]}}
+}
+```
+方案二: webpack与ESLint集成
+使用eslint-loader,构建时检查JS规范
+```js
+module.rules[0].use=['babel-loader','eslint-loader'];
+```
 
+webpack打包库和组件
+webpack除了可以用来打包应用,也可以用来打包js库
+实现一个大整数加法的打包
+* 需要打包压缩版和非压缩版本
+* 支持AMD/CJS/CJS/ESM 模块引入
+库的目录结构和打包要求
+打包输出的库名称:
+* 未压缩版 large-number.js
+* 压缩版 large-number.min.js
+```
+|-/dist
+|--large-number.js
+|--large-number.min.js
+|-webpack.config.js
+|-package.json
+|-/src
+|--index.js
+```
+支持的使用方式
+ESM: `import * as largeNumber from 'large-number'; largeNumber(a,b);`
 
+CJS: `const largeNumber = require('large-number'); largeNumber(a,b);`
+
+AMD: `require(['large-number'],function(largeNumber){ largeNumber(a,b);});`
+
+可以直接通过script引入 
+```html
+<script src="https://unpkg.com/large-number"></script>
+<script>
+    // global variable
+    largeNumber('999','1');
+    // Property in the window object
+    window.largeNumber('999','1');
+</script>
+```
+
+如何将库暴露出去?
+library: 指定库的全局变量
+libraryTarget: 支持库的引入方式
+
+```js
+module.exports={
+    mode: 'production',
+    entry:{
+        'large-number': './src/index.js',
+        'large-number.min': './src/index.js'
+    },
+    output:{
+        filename: '[name].js',
+        library: 'largeNumber',
+        libraryExport:'default',
+        libraryTarget:'umd'
+    }
+}
+```
+如何只对 .min压缩
+通过inclue设置 只压缩min.js 结尾的文件
+```js
+optimization={
+    minimize: true,
+    minmizer:[
+        new TerserPlugin({
+            inclue: /\.min\.js$/
+        })
+    ]
+}
+```
+
+设置入口文件 package.json的main字段为 index.js
+```js
+ if(process.env.NODE_ENV === 'production') module.exports=require('./dist/large-number.min.js');
+ else module.exports=require('./dist/large-number.js');
+ ```
+
+ 页面打开过程
+ 服务端渲染(SSR)是什么
