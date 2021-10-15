@@ -927,3 +927,106 @@ optimization={
 
  页面打开过程
  服务端渲染(SSR)是什么
+渲染:HTML+CSS+JS+Data -> 渲染后的HTML
+
+服务端:
+所有模板等资源都存在服务端
+内网机器拉取数据更快
+一个HTML返回所有数据
+
+浏览器和服务器交互流程
+请求开始-server-{html-template,data}-serverRender
+-浏览器解析并渲染-加载并执行js和其他资源-页面完全可交互
+
+
+客户端渲染vs服务端渲染
+|          | 客户端渲染                                | 服务端渲染            |
+| -------- | ----------------------------------------- | --------------------- |
+| 请求     | 多个请求(HTML,数据等)                     | 1个请求               |
+| 加载过程 | HTML&数据串行加载                         | 1个请求返回HTML和数据 |
+| 渲染     | 前端渲染                                  | 服务端渲染            |
+| 可交互   | 图片等静态资源加载完成,JS逻辑执行完可交互 |
+
+总结: 服务端渲染(SSR)的核心是减少请求
+
+SSR的优势
+1. 减少白屏时间
+2. 对于SEO友好
+
+SSR代码实现思路
+服务端
+* 使用 react-dom/server的 renderToString 方法将React组件渲染成字符串
+* 服务端路由返回对应的模板
+客户端
+* 打包出针对服务端的组件
+
+Webapck ssr打包存在的问题
+浏览器全局变量(Node.js中 没有 document,window);
+* 组件适配: 将不兼容的组件根据打包环境进行适配
+* 请求适配: 将fetch或者ajax发送请求的写法改成`isomorphic-fetch`或者`axios`
+样式问题(Node.js无法解析样式css)
+* 方案一: 服务端打包通过ignore-loader忽略掉css的解析
+* 方案二: 将style-loader替换成isomorphic-style-loader
+  
+如何解决样式不显示的问题?
+
+使用打包出来的浏览器端HTML为模板
+
+设置占位符,动态插入组件
+`<!--HTML_PLACEHOLDER-->`
+
+首屏数据如何处理
+服务端获取数据
+替换占位符
+
+当前构建时的日志显示
+展示一大堆日志,很多并不是开发者关注
+统计信息 stats
+| preset      | alternative | description                    |
+| ----------- | ----------- | ------------------------------ |
+| errors-only | none        | 只在发生错误时输出             |
+| minimal     | none        | 只在发生错误或有新的编译时输出 |
+| none        | false       | 没有输出                       |
+| normal      | true        | 标准输出                       |
+| verbose     | none        | 全部输出                       |
+
+
+如何优化命令行的构建日志
+使用 friendly-errors-webpack-plugin
+* success 构建成功的日志提示
+* warning 构建警告时的日志提示
+* error 构建报错时的日志提示
+
+stats 设置成erros-only
+```js
+const plugins=[new FriendlyErrorsWebpackPlugin()];
+const stats="errors-only";
+```
+
+如何判断构建是否成功?
+ 在CI/CD 的 pipeline 或者发布系统需要知道当前构建状态
+
+ 每次构建完成后输入 `echo $?` 获取错误码
+
+构建异常和中断处理
+webpack4之前的版本构建失败不会抛出错误码(error code)
+Node.js  中的 prcess.exit 规范
+* 0 表示成功完成,回调函数中,err 为null
+* 非0 表示执行失败,回调函数中,error不为null,error.code 就是传给exit的数字
+
+如何主动捕获并处理构建错误?
+compiler在每次构建结束后出发 done这个 hook
+
+process.exit 主动处理构建报错
+```js
+plugins:[
+    function(){
+        this.hook.done.tap('done',(stats)=>{
+            if(stats.compilation.erros && stats.compilation.erros.length && process.argv.indexOf('--watch')===-1){
+                console.log('build error');
+                process.exit(1);
+            }
+        })
+    }
+]
+```
