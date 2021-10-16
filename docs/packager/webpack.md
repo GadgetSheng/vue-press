@@ -1030,3 +1030,280 @@ plugins:[
     }
 ]
 ```
+
+### 04 编写可维护的webpack构建配置
+
+构建配置抽离成npm包的意义
+
+通用性
+* 业务开发者无需关注构建配置
+* 统一团队构建脚本
+
+可维护性
+* 构建配置合理的拆分
+* README文档、ChangeLog文档
+
+质量
+* 冒烟测试、单元测试、测试覆盖率
+* 持续集成 
+  
+构建配置管理的 可选方案
+* 通过多个配置文件管理不同环境的构建， webpack --config参数进行控制
+* 将构建配置设计成一个库，比如hjs-webpack，Neutino，webpack-blocks
+* 抽成一个工具进行管理，比如create-react-app，kyt，nwb
+* 将所有配置放在一个文件，通过 --env 参数控制分支选择
+
+构建配置包设计
+通过多个配置文件管理不同环境的webpack配置
+* 基础配置 webpack.base.js
+* 开发环境 dev
+* 生产环境 prod
+* ssr环境 ssr
+  
+抽离成一个npm包统一管理
+* 规范： git commit日志，readme，eslint规范，semver规范
+* 质量： 冒烟测试，单元测试，测试覆盖旅和CI
+
+通过webpack-merge 组合配置
+```js
+const merge = require('webpack-merge');
+module.exports=merge(baseConfig,devConfig);
+```
+
+功能模块设计
+* 基础配置：base
+  * 资源解析:ES6,React,CSS,Less,图片,字体
+  * 样式增强:CSS前缀补齐，CSS px转换成rem
+  * 目录清理
+  * 多页面打包
+  * 命令行信息显示优化
+  * 错误捕获和处理
+  * CSS提取成一个单独的文件
+* 开发阶段配置：
+  * 代码热更新：CSS热更新，JS热更新
+  * sourcemap
+* 生产阶段配置：
+  * 代码压缩
+  * 文件指纹
+  * Tree Shaking
+  * Scope Hoisting
+  * 速度优化： 基础包CDN
+  * 体积优化： 代码分割
+* SSR配置：
+  * output的libraryTarget设置
+  * CSS解析的ignore
+
+目录结构设计
+lib 放置源代码
+test 放置测试代码
+使用eslint规范构建脚本
+使用 eslint-config-airbnb-base
+eslint --fix 可以自动处理空格
+```js
+module.exports={
+    "parser": "babel-eslint",
+    "extends": "eslint-config-airbnb-base",
+    "env":{
+        "browser": true, "node": true
+    }
+}
+```
+
+冒烟测试 smoke testing
+冒烟测试是指对提交测试的软件在进行详细深入的测试之前而进行的预测试，
+这种预测试的主要目的是暴露导致软件需重新发布的基本功能失效等严重问题
+
+冒烟测试执行
+构建是否成功
+每次构建完成build目录是否有内容输出
+* 是否有JS、CSS等静态资源文件
+* 是否有HTML文件
+  
+判断是否构建成功
+在示例项目里面运行构建，看看是否有报错
+```js
+const path = require('path');
+const webpack = require('webpack');
+const rimraf = require('rimraf');
+const Mocha = require('mocha');
+
+const mocha = new Mocha({ timeout: '10000ms' });
+process.chdir(__dirname);
+
+rimraf('./dist',()=>{
+    const prodConfig= require('../../lib/webpack.prod');
+    webpack(prodConfig,(err,stats)=>{
+        if(err) console.error(err); return;
+        console.log(stats.toString({
+            colors: true,modules: false,children: false,chunks: false,chunkMoudles:false
+        }))
+    });
+    console.log('\n'+'Complier success, begin mocha test');
+});
+```
+
+判断基本功能是否正常
+编写mocha测试用例 是否有JS，CSS静态资源，HTML文件;
+```js
+const glob =  require('glob-all');
+describe('checking generated file exists',function(){
+    it('should generate html files',function(done){
+        const files=glob.sync(['./dist/index.html','./dist/search.html']);
+        if(files.length>0) done();
+        else throw new Error('No html files found');
+    });
+
+    it('should generate js & css files',function(){
+        const files=glob.sync(['./dist/index_*.js','./dist/index_*.css']);
+        if(files.length>0) done();
+        else throw new Error('No files found');
+    });
+})
+```
+
+单元测试与测试覆盖率
+单纯测试框架，需要断言库
+* chai
+* should.js
+* expect
+* better-assert
+
+集成框架 开箱即用
+* Jasmine
+* Jest
+
+极简API
+
+
+编写单元测试用例
+* 技术选型: Mocha + Chai
+* 测试代码: describe + it + expect
+* 测试命令: mocha add.test.js
+```js
+const expect = require('chai').expect;
+const add = require('../src/add');
+describe('use expect: src/add.js',()=>{
+    it('add(1,2)===3',()=>{
+        expect(add(1,2).to.equal(3));
+    })
+});
+```
+单元测试接入
+1. 安装 mocha + chai
+2. 新建test目录，并增加 [name].test.js测试文件
+3. 在package.json中 scripts 字段增加 test命令 `node_modules/mocha/bin/_mocha`
+4. 执行测试命令 `npm run test`
+
+持续集成的作用
+优点： 快速发现错误，放置分支大幅偏离主干
+
+核心措施是，代码集成到主干之前，必须通过自动化测试。只要有一个测试用例失效就不能集成。
+
+Github最流行的CI （top10
+Travis CI,Circle CI,Jenkins,AppVeyor,CodeShip,Drone,Semaphore CI,Buildkite,Wercker,TeamCity
+
+接入Travis CI
+1. https://travis-ci.org 使用github账号登录
+2. 在/account/repositories 为项目开启
+3. 项目根目录下新增 travis.yml
+
+yml文件内容 install安装项目依赖 ，script运行测试用例
+```yml
+language: node_js
+
+sudo: false
+
+cache:
+    apt: true
+    directories:
+        - node_modules
+
+node_js: stable # 设置相应版本
+
+install:
+    - npm install -D # 安装构建依赖器
+    - cd ./test/template-project
+    - npm install -D # 安装构建依赖器
+
+script: 
+    - npm test
+```
+
+发布到npm
+添加用户 `npm adduser`
+升级版本
+* 升级补丁版本号 npm version patch
+* 升级小版本号 npm version minor
+* 升级大版本号 npm version major
+版本发布： npm publish
+
+git规范和changelog生成
+良好的 git commit规范优势：
+* 加快code-review流程
+* 根据git commit的元数据生成changelog
+* 后续维护者可以知道feature被修改的原因
+  
+技术方案, 提交格式- 
+统一团队commit标准 extends angular-gitcommit 
+使用commitize工具，validate-commit-msg工具，gitlab serverhook，
+使用conventional-changelog
+
+提交格式要求
+```
+<type>(<scope>): <subject>
+<BLANK LINE>
+<body>
+<BLANK LINE>
+<footer>
+```
+type代表某次提交的类型
+* feat 新增feature
+* fix 修复bug
+* docs 仅仅修改了文档，比如README，CHANGELOG，CONTRIBUTE等等
+* style 仅仅修改了空格，格式缩进，标点符号等，不改变代码逻辑
+* refactor 代码重构，没有加新的功能或者修复bug
+* perf 优化相关，比如提升性能、体验
+* test 测试用例 包括单元测试 集成测试等
+* chore 改变构建流程、或者增加依赖库 工具等
+* rever 同GIT回滚
+
+本地开发阶段增加preCommit钩子
+安装husky 通过commitmsg钩子校验信息
+```json
+{
+    "scripts": {
+        "commitmsg": "validate-commit-msg",
+        "changelog": "conventional-changelog -p angular -i CHANGELOG.md -s -r 0"
+    },
+    "devDependencies":{
+        "validate-commit-msg":"^2.11",
+        "conventional-changelog-cli": "^1.2",
+        "husky": "^0.13"
+    }
+}
+```
+
+开源项目版本信息案例
+* 软件的版本通常由三位组成，形如X.Y.Z
+* 版本是严格递增的
+* 在发布重要版本时，可以发布alpha,rc等先行版本
+* aplha，rc等修饰版本的关键字后面可以带上次数和meta信息
+
+遵守semsemver 规范的优势
+避免出现循环依赖
+依赖冲突减少
+
+语义化版本(Semantic Versioning)规范格式
+主版本号： 当你做了不兼容的API修改
+次版本号： 当你做了向下兼容的功能新增
+修订号: 当你做了向下兼容的问题修正
+
+先行版本号
+
+先行版本号可以作为发布正式版之前的版本，格式是在修订版本号后面加上一个连接号(-),
+再加上一连串以点(.)分割的标识符，标识符可以由英文数字和连接号[0-9A-Za-z-]组成
+* alpha 是内部测试版，一般不向外发布，会有很多bug，一般只有测试人员使用。
+* beta 也是测试版，这个阶段的版本不会一直加入新的功能，在Alpha版本之后推出
+* rc Release Candidate 系统平台上就是发行候选版本。RC版本不会再加入新的功能了，主要着重于除错
+
+
