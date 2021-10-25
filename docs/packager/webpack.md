@@ -1306,4 +1306,328 @@ type代表某次提交的类型
 * beta 也是测试版，这个阶段的版本不会一直加入新的功能，在Alpha版本之后推出
 * rc Release Candidate 系统平台上就是发行候选版本。RC版本不会再加入新的功能了，主要着重于除错
 
+### Webpack构建速度和体积优化策略
+
+初级分析：使用webpack内置的stats
+
+stats：构建的统计信息
+package.json 中使用 stats
+`"build:stats":"webpack --env production --json > stats.json"`,
+
+Node.js 使用
+```js
+const webpack =require('webpack');
+const config = require('./webpack.config.js')('production');
+
+webpack(config,(err,stats)=>{
+    if(err) return console.error(err);
+    if(stats.hasErrors()){
+        return console.error(stats.toString('errors-only'));
+    }
+    console.log(stats);
+})
+```
+** 颗粒度太粗，看不出问题所在
+
+速度分析： 使用speed-measure-webpack-plugin
+代码示例
+```js
+const SpeedMeasurePlugin = require('speed-measure-webpack-plugin');
+const smp = new SpeedMeasurePlugin();
+const webpackConfig = smp.wrap({
+    plugins: [
+        new MyPugin(),
+        new MyOtherPlugin()
+    ]
+});
+```
+可以看到每个loader和插件执行耗时
+
+速度分析插件作用
+分析整个打包总耗时
+每个插件和loader的耗时情况
+
+webpack-bundle-analyzer 分析体积
+代码示例
+```js
+const BunldeAnalyzerPlugin = require('webpack-bundle-analyzer').BundleAnalyzerPlugin;
+module.exports = { plugins: [new BundleAnalyzerPlugin()]}
+```
+构建完成后会在8888端口展示大小
+可以分析哪些问题
+* 依赖的第三方模块文件大小
+* 业务里面的组件代码大小
+
+使用高版本的webpack和Node.js
+构建时间降低了60%-98%；
+
+使用webpack4 优化原因
+* V8带来的优化（for of替代forEach Map Set替代Object includes替代indexOf）
+* 默认使用更快的md4 hash算法
+* webpack AST可以直接从loader传递给AST，减少解析时间
+* 使用字符串方法替代正则表达式
+
+多进程/多实例构建：资源并行解析可选方案
+thread-loader 可选方案 parallel-webpack HappyPack
+多进程/多实例：使用HappyPack解析资源
+原理：每次webpack 解析一个模块，HappyPack会将它及它的依赖分配给worker线程中
+代码示例
+```js
+exports.plugins=[
+    new HappyPack({
+        id: 'jsx',
+        threads: 4,
+        loaders:['babel-loader']
+    }),
+    new HappyPack({
+        id: 'styles',
+        threads: 2,
+        loaders: ['style-loader','css-loader','less-loader']
+    })
+]
+```
+多进程/多实例：使用thread-loader解析资源
+ 原理：每次webpack解析一个模块 thread-loader会将它及它的依赖分配给worker线程中
+ ```js
+ const json={
+     "module.rules":[
+         {
+             test:/.js$/,
+             use: [
+                 {
+                     loader:'thread-loader',
+                     options:{
+                         workers: 3
+                     }
+                 },
+                 'babel-loader',
+                 // 'eslint-loader'
+             ]
+         }
+     ]
+ }
+ ```
+
+多进程/多实例：并行压缩
+方法一：使用parallel-uglify-plugin插件
+```js
+const ParallelUglifyPlugin=require('webpack-parallel-uglify-plugin');
+module.exports={
+    plugins:[
+        new ParallelUglifyPlugin({
+            uglifyJS:{
+                output: {
+                    beautify: false,
+                    comments: false
+                },
+                compress:{
+                    warnings: false,
+                    drop_console: true,
+                    collapse_vars: true,
+                    reduce_vars: true
+                }
+            }
+        })
+    ]
+}
+```
+
+并行压缩
+方法二：uglifyjs-webpack-plugin 开启parallel参数
+```js
+const UglifyJsPlugin=require('uglifyjs-webpack-plugin');
+module.exports={
+    plugins:[
+        new UglifyJsPlugin({
+            uglifyOptions:{
+                warnings: true,
+                parse:{},
+                compress: {},
+                mangle: true,
+                output: null,
+                toplevel: false,
+                nameCache: null,
+                ie8: false,
+                keep_fnames: false
+            },
+            parallel: true
+        })
+    ]
+}
+```
+并行压缩
+方法三：terser-webpack-plugin 开启 parallel参数
+```js
+const TerserPlugin=require('terser-webpack-plugin');
+module.exports={
+    optimization:{
+        minimizer:[
+            new TerserPlugin({
+                parallel: 4
+            })
+        ]
+    }
+}
+```
+
+分包：设置Externals
+思路：将 react、react-dom基础包 通过cdn引入，不打入bundle中
+方法: 使用html-webpack-externals-plugin
+```js
+new HtmlWebpackExternalsPlugin({
+    externals:[
+        {
+            module: 'react',
+            entry: '//11.url.cn/now/lib/15.1.0/react-with-addons.min.js?v=1',
+            global: 'React'
+        },
+        {
+            module: 'react-dom'
+            entry: '//11.url.cn/now/lib/15.1.0/react-dom.min.js?v=1',
+            global: 'ReactDom'
+        }
+    ]
+})
+```
+
+进一步设置分包：预编译资源模块
+思路： 将react、react-dom、redux、react-redux基础包和业务基础包打成一个文件
+方法：使用DLLPlugin 进行分包，DllReferencePlugin 对manifest.json引用
+```js
+const path=require('path');
+const webpack=require('webpack');
+module.exports={
+    context: process.cwd(),
+    resolve:{
+        extensions: ['.js','.jsx','.json','.less','.css'],
+        modules:[__dirname,'node_modules']
+    },
+    entry:{
+        library:['react','react-dom','redux','react-redux']
+    },
+    output:{
+        filename: '[name].dll.js',
+        path: path.resolve(__dirname,'./build/library'),
+        library: '[name]'
+    },
+    plugins:[
+        new webpack.DllPlugin({
+            name: '[name]',
+            path: './build/library/[name].json'
+        })
+    ]
+}
+```
+在webpack.config.js引入
+```js
+module.exports={
+    plugins:[
+        new webpack.DllReferencePlugin({
+            manifest: require('./build/library/manifest.json')
+        })
+    ]
+}
+```
+引用效果
+`<script src="/build/library/library.dll.js"></script>`
+
+缓存
+目的：提升二次构建速度
+缓存思路：
+babel-loader 开启缓存
+terser-webpack-plugin 开启缓存
+使用cache-loader或者 hard-source-webpack-plugin
+
+缩小构建目标
+目的:尽可能的少构建模块
+比如babel-loader不解析node_modules
+`loader:'happypack/loader',exclude:'node_modules'`
+
+减少文件搜索范围
+优化 resolve.modules设置（减少模块搜索层级）
+优化resolve.mainFields 配置
+优化 resolve.extensions 配置
+合理使用alias
+```js
+module.exports={
+    resolve:{
+        alias:{
+            react: path.resolve(__dirname,'./node_modules/react/dist/react.min.js'),
+        },
+        modules: [path.resolve(__dirname,'node_modules')],
+        extensions: ['.js'],
+        mainFields: ['main']
+    }
+}
+```
+
+图片压缩
+要求：基于Node库的imagemin或者tinypng API
+使用：配置image-webpack-loader
+```js
+return {
+    test: /\.(png|svg|jpg|gif|blob)$/,
+    use:[
+        {loader: 'file-loader',options:{ name: `${filename}img/[name]${hash}.[ext]`}}
+        {loader: 'image-webpack-loader',options:{
+            mozjpeg:{progresive: true,quality: 65},
+            optipng:{enabled: false},
+            pngquant:{quality:'65-90',speed:4},
+            gifsicle:{interlaced:false},
+            webp:{quality:75}
+        }}
+    ]
+}
+```
+
+Imagemin优点分析
+ 有很多定制选项
+ 可以引入更多第三方优化插件 例如pngquant
+ 可以处理多种图片格式
+ 压缩原理
+* pngquant:  是一款png压缩器，通过将图像转为具有alpha通道的更高效的8为PNG格式，可显著减少文件大小
+* pngcrush： 其主要目的是通常尝试不同的压缩级别和PNG过滤方法来降低PNG IDAT数据流的大小
+* optipng: 其设计灵感来自于pngcrush。optipng可将图像文件重新压缩为更小尺寸，而不是会丢失任何信息
+* tinypng：也是将24位png文件转化为更小有索引的8位图片，同时所有非必要的metadata也会剥离掉
+
+#### Tree  Shanking（复习
+概念： 1个模块可能有多个方法，只要其中的某个方法使用到了，则整个文件都会被打到
+bundle 里面去，tressshaking就是把用到的方法打入bundle，没用到的方法会在uglify阶段被擦除掉
+
+使用webpack默认支持，在.babelrc里设置modules: false 即可
+.production mode情况下默认开启
+要求：必须是ES6语法，CJS的方式不支持
+
+无用的CSS如何删除掉
+PurifyCSS便利代码，识别已经用到的CSS class
+uncss： HTML需要通过jsdom加载，所有的样式通过PostCSS解析，通过
+document.querySelector来识别html文件里面不存在的选择器
+
+在webpack中如何使用PurifyCSS
+使用purgress-webpack-plugin 和mini-css-extract-plugin配合使用
+和mini-css-extract-plugin
+```js
+module.exports={
+    plugins:[
+        new MiniCssExtractPlugin({
+            filename:'[name].css'
+        }),
+        new PurgecssPlugin({
+            paths: glob.sync(`${PATH.src}/**/*`,{nodir: true`})
+        })
+    ]
+}
+```
+构建体积优化动态polyfill
+babel-polyfill 打包后体积88.49K!!!
+Promise的浏览器支持情况
+| 方案                           | 优点                               | 缺点                   | 是否采用 |
+| ------------------------------ | ---------------------------------- | ---------------------- | -------- |
+| babel-polyfill                 | React官方推荐                      | 包体积大               | x        |
+| babel-plugin-transform-runtime | 能只polyfill到方法                 | 不能polyfill原型上魔法 | x        |
+| 自己map，set的polyfill         | 定制化高                           | 积小小                 | x        |
+| polyfill                       | 只给用户回需要的polyfill，社区维护 | 部分国内UA挂           | ☑️        |
+
+
+
 
