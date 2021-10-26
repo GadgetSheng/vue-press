@@ -1626,7 +1626,25 @@ Promise的浏览器支持情况
 | babel-polyfill                 | React官方推荐                      | 包体积大               | x        |
 | babel-plugin-transform-runtime | 能只polyfill到方法                 | 不能polyfill原型上魔法 | x        |
 | 自己map，set的polyfill         | 定制化高                           | 积小小                 | x        |
-| polyfill                       | 只给用户回需要的polyfill，社区维护 | 部分国内UA挂           | ☑️        |
+| polyfill-service               | 只给用户回需要的polyfill，社区维护 | 部分国内UA挂           | ☑️        |
+
+Polyfill Service 原理
+识别UserAgent 下发不同的Polyfill
+
+构建体积优化：如何动态PolyfillService
+polyfill.io 官方提供的服务
+`<script src="https://cdn.polyfill.io/v2/polyfill.min.js"></script>`
+
+基于官方自建的polyfill服务
+
+体积优化策略总结
+* Scope Hoisting
+* Tree Shaking
+* 公用资源分离
+* 图片压缩
+* 动态polyfill
+
+
 
 
 
