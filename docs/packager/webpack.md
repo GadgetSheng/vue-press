@@ -1306,7 +1306,7 @@ type代表某次提交的类型
 * beta 也是测试版，这个阶段的版本不会一直加入新的功能，在Alpha版本之后推出
 * rc Release Candidate 系统平台上就是发行候选版本。RC版本不会再加入新的功能了，主要着重于除错
 
-### Webpack构建速度和体积优化策略
+### 05 Webpack构建速度和体积优化策略
 
 初级分析：使用webpack内置的stats
 
@@ -1644,8 +1644,31 @@ polyfill.io 官方提供的服务
 * 图片压缩
 * 动态polyfill
 
+### 06 通过源码掌握webpack打包原理
+开始： 从webpack命令行说起
+通过npm scripts运行 webpack
+* 开发环境 npm run dev
+* 生产环境 npm run build
+通过webpack直接运行
+* webpack entry.js bundle.js
+> 这个过程发生了什么
 
+查找webpack入口文件
+在命令行运行以上命令后，npm会让命令行工具 进入`node_modules/.bin`
+目录查找是否存在webpack.sh或者webpack.cmd文件，如果存在，就执行
+不存在则抛出错误
+实际入口文件是: node_modules/webpack/in/webpack.js
 
+分析webpack的入口文件: webpack.js
+```js
+process.exitCode = 0；
+const runCommand=(command,args)=>{...};
+const isInstalled=packagName => {...};
+const CLIs=[...]
+// webpack-command
+const installcides=CLI.filter(cli=>cli.installed);
+if (installedClis.length===0){...}else if
+(installedClis.length===1)
+```
 
-
-
+-5/39
