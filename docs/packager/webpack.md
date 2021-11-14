@@ -1649,6 +1649,7 @@ polyfill.io 官方提供的服务
 通过npm scripts运行 webpack
 * 开发环境 npm run dev
 * 生产环境 npm run build
+
 通过webpack直接运行
 * webpack entry.js bundle.js
 > 这个过程发生了什么
@@ -1671,4 +1672,268 @@ if (installedClis.length===0){...}else if
 (installedClis.length===1)
 ```
 
--5/39
+启动后的结果
+webpack最终找到 webpack-cli(webpack-command)这个 npm包
+并且执行cli
+
+webpack-cli做的事情
+引入yargs，对命令进行定制
+分析命令行参数，对各个参数进行转换，组成编译配置项
+引用webpack，根据配置项进行编译和构建
+
+从NON_COMPILATION_CMD分析出不需要编译的命令
+webpck-cli 处理不需要经过编译的命令
+```js
+const { NON_COMPILATION_ARGS} = require('./utils/constants');
+const NON_COMPILATION_CMD= process.argv.find(arg=>{
+    if(arg === 'serve'){
+        global.precess.argv=global.process.argv.filter(a=>a!=='serve');
+        process.argv=global.process.argv;
+    }
+    return NON_COMPILATION_ARGS.find(a=>a===arg);
+})
+if(NON_COMPILATION_CMD){
+    return require('./utils/prompt-command')(NON_COMPILATION_CMD,...process.argv);
+}
+```
+
+_ARGS 的内容
+init // 创建一份webpack配置文件
+migrate // 进行webpack版本迁移 
+add // 往webpack配置文件中增加属性
+remove // 删除属性
+serve // 运行webpack-serve
+generate-loader // 生成loader代码   
+generate-plugin // 生成plugin代码
+info 返回与本地环境相关的一些信息
+
+命令行工具包yargs介绍
+
+动态生成help 帮助信息
+
+webpack-cli使用args分析
+参数分组(config/config-args.js),将命令划分为9类
+
+config options 配置相关的参数 文件名称，运行环境等
+basic options 基础参数 entry设置，debug模式，watch，devtool设置等
+module options 模块参数，给loader 设置扩展
+output options 输出参数（输出路径，输出文件名称
+advacnded options 高级用法，记录设置，缓存设置，监听频率，bail等
+resloving options 解析参数 alias和解析文件后缀 设置
+optmization options 优化参数
+status options 统计参数
+options 通用参数 帮助命令 版本信息等
+
+webpack-cli 执行结果
+webpack-cli 对配置文件和命令行参数进行转换最终生成配置选项参数options
+最终会根据配置参数实例化webpack对象，然后执行构建流程
+webpack本质
+webpack可以将其理解是一种基于事件流的编程规范，一系列的插件运行
+先看一段代码
+核心对象Compiler继承Tapable
+class Compiler extends Tapable{
+    //
+}
+核心对象Compilation集成Tapable{
+    //
+}
+Tapable是什么？
+Tapable是一个类似于Node.js的EventEmitter的库,主要是控制钩子的发布与订阅，控制这个webpack的插件系统
+Tapable库暴露了很多Hooks
+...
+
+#### 模拟Compiler.js
+```js
+module.exports=class Compiler{
+    constructor(){
+        this.hoos={
+            accelerate: new SyncHook(['newspped']),
+            brake: new SyncHook(),
+            calculateRoutes:new AsyncSeriesHook(['source','target','routesList'])
+        }
+    }
+    run(){
+        this.accerate(10)
+        this.break()
+        this.calculateRoutes('Async','hook','demo')
+    }
+    accelerate(speed){
+        this.hooks.accelerate.call(speed);
+    }
+    break(){
+        this.hooks.brake.call();
+    }
+    calculateRoutes(){
+        this.hooks.calculateRoutes.promise(...arguments).then(()=>{},err=>{console.lerror(err)});
+    }
+}
+```
+
+插件 my-plugins.js
+```js
+const Compiler=require('./Compiler');
+class MyPlugin{
+    constructor(){}
+    apply(compiler){
+        compiler.hooks.brake.tap('WarningLampPlugin',()=>console.log('WarningLampPlugin'));
+        compiler.hooks.accelerate.tap('LoggerPlugin',newSpeed=>console.log(`Accelerating to ${newSpeed}`));
+        compiler.hooks.calculateRoutes.tapPromise('calculateRoutes tapAsync',(source,target,routesList)=>{
+            return new Promise((resolve,reject)=>{
+                setTimeout(()=>{
+                    console.log(`tapPromise to ${source}${target}${routesList}`);
+                    reslove();
+                },1000)
+            })
+        })
+    }
+}
+```
+模拟插件执行
+```js
+const myPlugin =new MyPlugin();
+const options={plugins: [myPlugin]};
+const compiler=new Compiler();
+for(const plugin of options.plugins){
+    if(typeof plugin==='function'){
+        plugin.call(compiler,compiler);
+    }else{
+        plugin.apply(compiler);
+    }
+}
+compiler.run();
+```
+
+#### Webppack 流程篇
+webpack的编译都按照下面的钩子调用顺序执行
+*entry-option -> *run -> *make -> *before-resolve -> *build-module
+-> *normal-module-loader -> *program -> *seal -> *emit
+1. 初始化 option 
+2. 开始编译
+3. 从entry开始递归的分析依赖，对每个依赖模块进行build
+4. 对模块位置进行解析
+5. 开始构建某个模块
+6. 将loader加载完成的module进行编译，生成AST树
+7. 遍历AST树，当遇到require等一些调用表达式时，收集依赖
+8. 所有依赖build完成，开始优化
+9. 输出到dist目录
+
+WebpackOptionsApply
+将所有的配置options参数转换成 webpack内部插件
+使用默认插件列表
+举例:
+* outpu.library->LibraryTemplatePlugin
+* externals->ExternalsPlugin
+* devtool->EvalDevtoolModulePlugin,SourceMapDevToolPlugin
+* AMDPlugin,CommonJsPlugin
+* RemoveEmptyChunksPlugin
+
+Compiler Hooks
+流程相关：
+* before-)run
+* before-/after-)compile
+* make
+* after-)emit
+* done
+监听相关:
+* watch-run
+* watch-close
+
+Compilation
+Compiler调用Compilation生命周期方法
+* addEntry -> addModuleChain
+* finish(上报模块错误)
+* seal
+
+ModuleFactory
+* NormalModuleFactory
+* ContextModuleFactory
+Module
+* NormalModule
+* ContextModule(./src/*)
+* ExternalModule(module.exports=jQuery)
+* DelegatedModule(manifest)
+
+NormalModule
+Build
+* 使用loader-runner运行loaders
+* 通过Parse解析(内部是acron)
+* ParsePlugins添加依赖
+
+Compilation hooks
+模块相关
+* build-module
+* failed-module
+* succeed-module
+优化相关：
+* after-)seal
+* optimize
+* optimize-modules(-basic/advanced)
+* after-optimize-modules
+* after-optimize-chunks
+* after-optimize-tree
+* optimize-chunk-modules(-basic/advanced)
+
+资源生成相关：
+* module-asset
+* chunk-asset
+
+Chunk 生成算法
+1. webpack先将entry中对应的module都生成一个新的chunk
+2. 遍历module的依赖列表，将依赖的module也加入到chunk中
+3. 如果一个依赖module是动态引入的模块，那么就会根据这个module创建一个新的chunk，继续遍历依赖
+4. 重复上面的过程直至得到所有的chunks
+   
+模块化：增加代码可读性和维护性
+传统的网页开发转变成WebApps开发
+代码复杂度在逐步增高
+分离的JS文件/模块，便于后续代码的维护性
+部署时希望把代码优化成几个HTTP请求
+
+常见的集中模块化方式
+ES module
+CJS
+AMD
+
+AST 基础知识
+抽象语法树(abstract syntax tree),或者语法树(syntax tree),是源代码的抽象语法结构的树状表现形式,这里特指编程语言的源代码，树上的每个节点都表示源代码中的一种结构
+
+#### 复习一下webpack的模块机制
+```js
+(function(modules){
+    var installedModules={};
+
+    function __webpack_require__(moduleId){
+        if(installedModules[moduleId]){
+            return installedModules[moduleId].exports;
+        }
+        var module = installedModules[moduleId] = {
+            i: moduleId,
+            l: false,
+            exports: {}
+        };
+        modules[moduleId].call(module.exports,module,module.exports,__webpack_require__);
+        module.l=true;
+        return module.exports;
+    }
+    __webpack_require__(0);
+})([
+    /* 0 module */
+    (function(module,__webpack_exports__,__webpack_require__){
+        // ...
+    },
+    /* 1 module */
+
+])
+```
+* 打包出来的是一个 IIFE（匿名闭包)
+* modules 是一个数组，每一项是一个模块初始化函数
+* __webpack_require用来加载模块，返回module.exports
+* 通过WEBPACK_REQUIRE_METHOD(0) 启动程序
+
+动手实现一个简易的webpack
+1. 可以将ES6语法转换成ES5的语法
+   * 通过babylon 生成AST
+   * 通过babel-core将AST重新生成源码
+2. 可以分析模块之间的依赖关系
+   * 通过babel-traverse 的 ImportDeclaration方法获取依赖属性
+3. 生成的JS文件可以在浏览器中运行
