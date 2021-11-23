@@ -1937,3 +1937,149 @@ AST 基础知识
 2. 可以分析模块之间的依赖关系
    * 通过babel-traverse 的 ImportDeclaration方法获取依赖属性
 3. 生成的JS文件可以在浏览器中运行
+
+
+### 07 编写Loader插件
+定义: loader只是一个导出为函数的javascript模块
+`module.exports=function(source){ return source}`
+
+多loader时的执行顺序
+多个loader串行执行 顺序从后到前
+```js
+module.exports={
+//...
+    module:{
+        rules:[
+            {test: /\.less$/,use:['style-loader','css-loader','less-loader']}
+        ]
+    }
+}
+```
+
+函数组合的两种情况
+Unit中的pipline
+Compose（webpack采取的是这种
+`compose=(f,g)=>(...args)=>f(g(...args));`
+
+通过一个例子验证 loader的执行顺序
+a-loader.js
+export=function(source){console.log('loader a is executed'); return source;}
+b-loader.js
+export=function(source){console.log('loader b is executed'); return source;}
+
+7. loader-runner介绍
+定义：loader-runner允许你在不安装webpack的情况下运行loaders
+作用： 
+* 作为webpack的依赖，webpack中使用它执行loader
+* 进行loader的开发和调试
+
+8. loader-runner的使用
+```js
+import {runLoaders} from 'loader-runner';
+runLoaders({
+    resource: '/abs/path/to/file.txt?query', // String: 资源的绝对路径 可加query
+    loaders: ['/abs/path/to/loader.js?query'],// String[]:loader的绝对路径 可加query
+    context: {minimize:true}, // 基础上下文之外额外的loader上下文
+    readResource: fs.readFile.bind(fs)// 读取资源的函数
+},function(err,result){
+    // error: Error?
+    // result.result: Buffer|String
+})
+```
+9. 开发一个raw-loader
+```js
+// src/raw-loader.js
+module.exports=function(source){
+    const json=JSON.stringify(source)
+    .replace(/\u2028/g,'\\u2028')
+    .replace(/\u2029/g,'\\u2029') // 为了安全起见，ES模板字符串的问题
+    return `export default ${json}`;
+};
+
+// src/demo.txt
+foobar
+
+```
+10. 使用loader-runner调试loader
+run-loader.js
+```js
+const fs=require('fs');
+const path=require('path');
+const {runLoaders}= require('loader-runner');
+runLoaders({
+    resource: './demo.txt',
+    loaders: [path.resolve(__dirname,'./loaders/raw-loader')],
+    readResource: fs.readFile.bind(fs)
+},(err,result)=>(err?console.error(err):console.log(result))
+);
+```
+查看运行结果： node run-loader.js
+
+11. loader的参数获取
+通过 loader-utils的getOptions方法获取
+```js
+const loaderUtils=require('loader-utils');
+module.exports=function(content){
+    const {name}=loaderUtils.getOptions(this);
+}
+```
+
+12. loader的异常处理
+
+loader内置直接通过throw抛出
+通过this.callback传递错误
+`this.callback(error: Error|null,content: string|Buffer,sourceMap?:SourceMap,meta?: any);`
+13. loader的异步处理
+通过this.async 来返回一个异步函数
+* 第一个参数是Error，第二个参数是处理的结果
+```js
+module.exports=function(input){
+    const callback=this.async();
+    // No callback=> return synchronous results
+    // if(callback) 
+    callback(null,input+input);
+}
+```
+
+13. 在loader中使用缓存
+webpack中默认开启loader缓存
+*  可以使用 this.cacheable(false) 关掉缓存
+缓存条件: loader的结果在相同的输入下有确定的输出
+* 有依赖的loader无法使用缓存
+  
+14. loader如何进行文件输出?
+
+通过this.emitFile进行写入
+```js
+const loaderUtils=require('loader-utils');
+module.exports=funciton(content){
+    const url=loaderUtils.interpolateName(this,'[hash].[ext]',{content});
+    this.emitFile(url,content);
+    const path= `__webpack_public_path__+ ${JSON.stringify(url)};`;
+    return `export default ${path}`;
+}
+```
+
+#### 实战开发一个自动合成雪碧图的loader
+支持的语法:
+1. `background: url('a.png?__sprite');`
+2. `background: url('b.png?__sprite');`
+---> background: url('sprite.png');
+准备知识: 如何将两张图片合成一张图片?
+使用 spritesmith(https://www.npmjs.com/package/spritesmith)
+
+spritesmith使用示例  
+```js
+const sprites=['./images/1.jpg','./images/2.jpg'];
+Spritesmith.run({src: sprites},function handleResult(err,result){
+    // result.image;
+    // result.coordinates;
+    // result.properties;
+})
+```
+
+#### 插件的运行环境
+18. 插件没有像loader那样的独立运行环境
+只能在webpack里面运行
+
+19. 插件的基本结构 
