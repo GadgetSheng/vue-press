@@ -15,5 +15,5 @@ features:
   details: Note every thing maybe good idea of mine.
 - title: Practice
   details: Try nevermore and exercise ecmascript next.
-footer: MIT Licensed | Copyright©2021
+footer: MIT Licensed | Copyright©2022
 ---

@@ -6,7 +6,7 @@ const sidebar = [
   {
     text: 'Category',
     link: '/category/',
-    children: ['/category/article-1', '/category/article-2']
+    children: ['/category/learn-css', '/category/article-2']
   },
   {
     text: 'packager',
