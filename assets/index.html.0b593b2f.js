@@ -1,0 +1,1 @@
+const e={key:"v-fffb8e28",path:"/guide/",title:"Get Starter",lang:"en-US",frontmatter:{title:"Get Starter"},excerpt:"",headers:[],git:{updatedTime:1645768909e3},filePathRelative:"guide/index.md"};export{e as data};

@@ -1,0 +1,1 @@
+const e={key:"v-4e908c4b",path:"/packager/vite.html",title:"vite",lang:"en-US",frontmatter:{},excerpt:"",headers:[],git:{updatedTime:1645768909e3},filePathRelative:"packager/vite.md"};export{e as data};
